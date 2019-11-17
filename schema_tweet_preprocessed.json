@@ -1,0 +1,48 @@
+[
+  {
+    "name": "text",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "retweet_count",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "favorite_count",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+	"name": "hashtags",
+	"type": "STRING",
+	"mode": "NULLABLE"
+  },
+  {
+	"name": "user_location",
+	"type": "STRING",
+	"mode": "NULLABLE"
+  },
+  {
+	"name": "user_verified",
+	"type": "BOOLEAN",
+	"mode": "NULLABLE"
+  },
+  {
+	"name": "user_followers_count",
+	"type": "INTEGER",
+	"mode": "NULLABLE"
+  },
+  {
+	"name": "user_friends_count",
+	"type": "INTEGER",
+	"mode": "NULLABLE"
+  },
+  {
+    "name": "date",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  }
+]
+  
