@@ -5,11 +5,18 @@ import pandas as pd
 from stop_words import get_stop_words
 import re
 import base64
+from textblob import TextBlob
+from langdetect import detect
 
 def extract_hashtag(text):
     hashtag = re.findall(r"#(\w+)", text)
-    return " ".join(hashtag)
+    return hashtag
 
+def check_language(text):
+    return detect(text)
+
+def count_hashtag(text):
+    return len(text)
 
 def cleaner_txt(text):
     text = ''.join(text).lower()    
@@ -25,6 +32,19 @@ def cleaner_txt(text):
 def tokenization(text):
     return re.split('\W+', text)
 
+  
+def get_sentiment_description(polarity): 
+    ''' 
+    Utility function to classify sentiment of passed tweet 
+    using textblob's sentiment method 
+    '''
+    # set sentiment 
+    if polarity > 0: 
+        return 'positive'
+    elif polarity == 0: 
+        return 'neutral'
+    else: 
+        return 'negative'
 
 def tweet_cleaner(event, context):
     """Triggered from a message on a Cloud Pub/Sub topic.
@@ -38,58 +58,66 @@ def tweet_cleaner(event, context):
     # Perform a query.
     sql = (
         'SELECT  '+
-        'text, retweet_count, favorite_count, hashtags,  user_location, '+
-        ' user_verified, user_followers_count, user_friends_count, '+ 
-        ' rt_retweet_count, rt_favorite_count,  rt_text, '+
-        ' CAST(created_at as DATE) as date ' +
-        ' FROM capstonettw.tweet ' +
-        ' WHERE DATE(created_at) = CURRENT_DATE()'
+        'text, quote_count, reply_count, '+
+        'retweet_count, favorite_count, user_screen_name, user_location, '+
+        'user_verified, user_followers_count, user_friends_count, '+
+        'user_listed_count, user_favourites_count, user_statuses_count, '+
+        'description, '+
+        'CAST(created_at as DATE) as date ' +
+        'FROM <> ' +
+        'WHERE DATE(created_at) <= CURRENT_DATE() ' 
+        'LIMIT 20'
     #    ' WHERE DATE(created_at) = "2019-11-14"'
     )
 
     # Insert the query result into a dataframe
     df = pd.read_gbq(sql, dialect='standard')
 
-
     # Extract all the words that starts with #
     df["hashtags"] = df.text.apply(extract_hashtag)
+    df["hashtags_count"]  = df.hashtags.apply(count_hashtag)
 
-    
-    # Transform RT features
-
-    df["rt_text"] = df.rt_text.replace("empty","")
-    df["text"] = df.text + df.rt_text
-    df["retweet_count"] = df["retweet_count"] + df["rt_retweet_count"]
-    df["favorite_count"] = df["favorite_count"] + df["rt_favorite_count"]
- 
     # Use regex to clean the text
     df["text"] = df.text.apply(cleaner_txt) 
+    df["description"] = df.description.apply(cleaner_txt) 
 
-    # Drop all unecessaries features
-    df.drop(columns=[ "rt_retweet_count", "rt_favorite_count", "rt_text"], inplace=True)
+    df['lang'] = df.text.apply(check_language)
+    #print(len(df))
+    df.drop(df[df.lang !='en'].index, inplace=True)
+    #print(len(df))
+
+    del df['lang']
+    # Drop all unecessaries lines
     df.drop(df[df.text ==''].index, inplace=True)
-    
+    df.drop_duplicates(subset=['user_screen_name', 'text'], keep='first', inplace=False)
     try:
         def remove_stop_word(word_list):
             filter_word =  [w for w in word_list if not w in stop_words]
-           
+
             return  ' '.join(filter_word)
 
         stop_words = list(get_stop_words('en'))         
     except Exception as e:
         print(e)
-    
+
     # Split the sentence into a array of words
     df['text'] = df['text'].apply(tokenization)
-
     # Remove Stop words
     df['text'] = df.text.apply(remove_stop_word)
 
+    df[['polarity', 'subjectivity']] = df['text'].apply(lambda text: pd.Series(TextBlob(text).sentiment))
+    df['sentiment'] = df.polarity.apply(get_sentiment_description)
+
+    #print(df.columns)
+
     try:
-        table_id = os.environ['TABLE_ID']
-        project_id = os.environ['PROJECT_ID']
-        df.to_gbq(destination_table=table_id, project_id=project_id, if_exists='append')
+        
+        #table_id = os.environ['TABLE_ID']
+        #project_id = os.environ['PROJECT_ID']
+        #df.to_gbq(destination_table=BQ_TABLE, project_id=PROJECT_ID, if_exists='append')
     except Exception as e:
         print(e)
     
 
+if __name__ == "__main__":
+    tweet_cleaner('x', 'y')
